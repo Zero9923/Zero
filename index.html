@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Zero</title>
+    <style>
+        /* ================== 全局与主屏幕样式 ================== */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+
+        #screen { width: 100vw; height: 100vh; background: url('https://image.uglycat.cc/x6ldyq.png') no-repeat center center/cover; position: relative; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 20px); padding-bottom: env(safe-area-inset-bottom, 20px); }
+        #dynamic-island { width: 120px; height: 35px; background-color: #000; border-radius: 20px; position: absolute; top: max(10px, env(safe-area-inset-top, 10px)); left: 50%; transform: translateX(-50%); z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
+        .camera-dot { width: 12px; height: 12px; background: #111; border-radius: 50%; box-shadow: inset -1px -1px 2px rgba(255,255,255,0.1); }
+
+        #pages-container { flex: 1; margin-top: 50px; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; touch-action: pan-x; }
+        #pages-container::-webkit-scrollbar { display: none; }
+        .page { min-width: 100vw; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 74px); padding: 20px 15px; gap: 10px 10px; scroll-snap-align: start; align-content: start; }
+
+        #dock-wrapper { padding: 10px 15px 25px 15px; }
+        #dock-container { height: 85px; padding: 10px 15px; background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border-radius: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-items: center; }
+
+        .grid-item { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; cursor: pointer; position: relative; }
+        img { -webkit-user-drag: none; pointer-events: none; } 
+        .app img { width: 52px; height: 52px; border-radius: 13px; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: transform 0.1s;}
+        .app:active img { transform: scale(0.9); } 
+        .grid-item span.app-name { margin-top: 6px; color: white; font-size: 11px; font-weight: 500; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 2px; }
+        #dock-container .app span.app-name { display: none; } #dock-container .app { justify-content: center; }
+
+        .polaroid-box, .douyin-box, .record-box, .music-box-wrap { width: 100%; height: 136px; background: transparent; position: relative; display: flex; }
+        .widget-label { margin-top: 6px; color: white; font-size: 11px; font-weight: 500; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+
+        /* ================== 组件样式 ================== */
+        .widget-polaroid { grid-column: span 4; grid-row: span 2; justify-content: center; } .polaroid-box { flex-direction: row; justify-content: space-evenly; align-items: center; } .polaroid { width: 28%; max-width: 95px; background: #ffffff; padding: 5px 5px 18px 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); position: relative; display: flex; flex-direction: column; border-radius: 0; } .polaroid img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: #eee; border-radius: 0; border: none; } .tape { position: absolute; background: rgba(210, 165, 110, 0.85); box-shadow: 0 1px 2px rgba(0,0,0,0.1); z-index: 10; } .p1 { transform: rotate(6deg) translateY(4px); } .p1 .tape { width: 60%; height: 16px; top: -6px; left: 15%; transform: rotate(-4deg); clip-path: polygon(2% 0%, 98% 5%, 95% 100%, 0% 95%); } .p2 { transform: rotate(-4deg) translateY(-2px); } .p2 .tape { width: 75%; height: 14px; top: -5px; left: 10%; transform: rotate(2deg); clip-path: polygon(0% 5%, 100% 0%, 98% 95%, 5% 100%); } .p3 { transform: rotate(5deg) translateY(6px); } .p3 .tape { width: 50%; height: 17px; top: -8px; left: 35%; transform: rotate(-6deg); clip-path: polygon(5% 0%, 95% 5%, 100% 100%, 0% 92%); }
+        .widget-douyin { grid-column: span 2; grid-row: span 2; justify-content: center; } .douyin-box { justify-content: center; align-items: center; } .dy-avatar-wrapper { position: relative; margin-top: 15px; margin-left: 10px; } .dy-ring { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #d4d4d4; display: flex; justify-content: center; align-items: center; position: relative; } .dy-avatar { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; background: #eee; } .dy-plus { position: absolute; bottom: -2px; right: -2px; width: 26px; height: 26px; background: #b0b0b0; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; line-height: 1; } .dy-bubble { position: absolute; bottom: 88px; right: 48px; background: #ffffff; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #333; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); white-space: nowrap; z-index: 10; } .dy-bubble::after { content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); border-top: 6px solid #ffffff; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: none; }
+        .widget-record { grid-column: span 2; grid-row: span 2; justify-content: center; } .record-box { justify-content: center; align-items: center; position: relative; } .re-vinyl { position: absolute; right: 6px; width: 102px; height: 102px; background: #111; border-radius: 50%; display: flex; justify-content: center; align-items: center; z-index: 1; background-image: repeating-radial-gradient( #111 0, #111 3px, #1a1a1a 4px, #1a1a1a 5px ); } .re-vinyl-cover { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; border: 1px solid #000; } .re-vinyl-hole { position: absolute; width: 6px; height: 6px; background: #000; border-radius: 50%; border: 1px solid #333; } .re-polaroid { position: absolute; left: 20px; width: 88px; background: #161616; padding: 5px 5px 20px 5px; z-index: 2; border-radius: 2px; } .re-polaroid img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: #333; } .re-star { position: absolute; color: #b3b3b3; font-family: Arial, sans-serif; pointer-events: none; line-height: 1; } .rs1 { top: 3px; left: 5px; font-size: 15px; } .rs2 { top: 5px; right: 6px; font-size: 10px; } .rs3 { bottom: 8px; left: 6px; font-size: 17px; } .rs4 { bottom: 9px; right: 10px; font-size: 12px; } .rs5 { bottom: 30px; right: 4px; font-size: 9px; color: #a0a0a0; }
+        .widget-music { grid-column: span 4; grid-row: span 2; justify-content: center; } .music-box-wrap { width: 100%; height: 156px; background: transparent; position: relative; display: flex; } .music-box { width: 100%; height: 100%; background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 22px; display: flex; align-items: center; padding: 15px 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; } .mu-left { width: 50%; height: 100%; display: flex; justify-content: center; align-items: center; } .mu-vinyl-wrapper { width: 120px; height: 120px; position: relative; } @keyframes spin { 100% { transform: rotate(360deg); } } .mu-vinyl { width: 100%; height: 100%; background: #111; border-radius: 50%; display: flex; justify-content: center; align-items: center; background-image: repeating-radial-gradient( #111 0, #111 2px, #1a1a1a 3px, #1a1a1a 4px ); animation: spin 5s linear infinite; box-shadow: 0 4px 8px rgba(0,0,0,0.3); } .mu-vinyl.paused { animation-play-state: paused; } .mu-vinyl-cover { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; border: 2px solid #000; } .mu-vinyl-hole { position: absolute; width: 8px; height: 8px; background: #ddd; border-radius: 50%; border: 1px solid #333; } .mu-stylus { position: absolute; top: -6px; right: -2px; width: 20px; height: 20px; z-index: 10; transform-origin: 10px 10px; transform: rotate(30deg); transition: transform 0.4s ease-in-out; } .mu-stylus.paused { transform: rotate(0deg); } .mu-stylus-pivot { width: 20px; height: 20px; border-radius: 50%; background: #e0e0e0; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); position: relative; z-index: 2; } .mu-stylus-arm { position: absolute; top: 14px; left: 8px; width: 4px; height: 52px; background: linear-gradient(to bottom, #ddd, #aaa); transform-origin: top center; transform: rotate(25deg); border-radius: 2px; } .mu-stylus-head { position: absolute; bottom: -8px; left: -3px; width: 10px; height: 14px; background: #666; border-radius: 2px; transform: rotate(-10deg); } .mu-right { width: 50%; height: 100%; display: flex; flex-direction: column; overflow: hidden; justify-content: space-between; padding-left: 12px; } .mu-info { display: flex; flex-direction: column; } .mu-title { font-weight: 800; font-size: 16px; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; } .mu-artist { font-size: 12px; color: #555; margin-top: 2px; font-weight: 500; } .mu-lyrics { flex: 1; margin: 8px 0; position: relative; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%); } @keyframes scrollLyrics { 0% { transform: translateY(25px); } 100% { transform: translateY(-75px); } } .mu-lyrics-inner { font-size: 12px; color: #666; text-align: left; line-height: 19px; font-weight: 500; animation: scrollLyrics 14s linear infinite; } .mu-lyrics-inner.paused { animation-play-state: paused; } .mu-controls { display: flex; justify-content: space-between; align-items: center; padding-top: 2px; } .mu-btn { color: #333; cursor: pointer; display: flex; align-items: center; justify-content: center; } .mu-btn svg { width: 16px; height: 16px; } .mu-btn.play svg { width: 18px; height: 18px; } 
+
+        /* 弹窗样式 */
+        #modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 999; display: none; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s; }
+        #modal-overlay.active { display: flex; opacity: 1; }
+        .modal { width: 90%; max-width: 360px; background: #F2F2F7; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
+        .modal-header { padding: 15px; text-align: center; font-weight: 600; font-size: 16px; border-bottom: 1px solid #ddd; background: #fff; }
+        .modal-content { padding: 15px; overflow-y: auto; }
+        .edit-card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 15px; box-shadow: 0 1px 5px rgba(0,0,0,0.05); }
+        .edit-card h4 { margin-bottom: 10px; font-size: 14px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+        .input-group { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 12px; color: #666; }
+        .input-group input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; outline: none; }
+        .file-upload { display: flex; align-items: center; gap: 10px; }
+        .file-upload input[type="file"] { font-size: 12px; width: 100%;}
+        .modal-footer { display: flex; border-top: 1px solid #ccc; background: #fff; }
+        .modal-btn { flex: 1; padding: 15px; text-align: center; font-size: 16px; color: #007AFF; font-weight: 500; cursor: pointer; }
+        .modal-btn.cancel { border-right: 1px solid #ccc; color: #FF3B30; }
+
+        /* ================== APP 专属装载画板 (路由核心) ================== */
+        #app-layer {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #F2F2F7; z-index: 9999; display: none; 
+            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        #app-layer.active { transform: translateY(0); display: block; }
+    </style>
+</head>
+<body>
+
+<div id="screen">
+    <div id="dynamic-island"><div class="camera-dot"></div></div>
+    <div id="pages-container"></div>
+    <div id="dock-wrapper"><div id="dock-container"></div></div>
+</div>
+
+<div id="modal-overlay">
+    <div class="modal" id="edit-modal">
+        <div class="modal-header">编辑小组件</div>
+        <div class="modal-content"></div>
+        <div class="modal-footer">
+            <div class="modal-btn cancel" onclick="closeModal()">取消</div>
+            <div class="modal-btn" onclick="saveWidget()">完成</div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 装载所有 APP 的全屏超级画板 ================= -->
+<div id="app-layer"></div>
+
+<!-- ================== 一次性引入所有 23 个软件的 JS 文件 ================== -->
+<!-- 哪怕这些文件现在还没建，浏览器报红字也无所谓，只要你建了就能瞬间生效！ -->
+<script src="wechat.js"></script>
+<script src="worldbook.js"></script>
+<script src="settings.js"></script>
+<script src="theme.js"></script>
+<script src="album.js"></script>
+<script src="weather.js"></script>
+<script src="couple.js"></script>
+<script src="jinjiang.js"></script>
+<script src="home.js"></script>
+<script src="archive.js"></script>
+<script src="diary.js"></script>
+<script src="game.js"></script>
+<script src="cloudmusic.js"></script>
+<script src="walkman.js"></script>
+<script src="accompany.js"></script>
+<script src="echo.js"></script>
+<script src="wechat_en.js"></script>
+<script src="check.js"></script>
+<script src="sms.js"></script>
+<script src="taobao.js"></script>
+<script src="discord.js"></script>
+<script src="xuexitong.js"></script>
+<script src="58.js"></script>
+
+<script>
+    window.oncontextmenu = function(e) { e.preventDefault(); return false; };
+
+    // 桌面所有软件的数据 (全部绑定了唯一的 appId)
+    const dockAppsData = [
+        { name: "微信", icon: "https://image.uglycat.cc/fv0c8t.png", appId: "wechat" },
+        { name: "世界书", icon: "https://image.uglycat.cc/uf7xf4.png", appId: "worldbook" },
+        { name: "设置", icon: "https://image.uglycat.cc/xu8b3u.png", appId: "settings" },
+        { name: "个性主题", icon: "https://image.uglycat.cc/3zqnla.png", appId: "theme" }
+    ];
+
+    const homeAppsData = [
+        { name: "相册", icon: "https://image.uglycat.cc/9jrj8u.png", appId: "album" },
+        { name: "天气", icon: "https://image.uglycat.cc/5x8mej.png", appId: "weather" },
+        { name: "情侣空间", icon: "https://image.uglycat.cc/ku0ozn.png", appId: "couple" },
+        { name: "晋江", icon: "https://image.uglycat.cc/7uslaf.png", appId: "jinjiang" },
+        { name: "家园", icon: "https://image.uglycat.cc/hsxzp5.png", appId: "home" },
+        { name: "档案", icon: "https://image.uglycat.cc/wi6h0e.png", appId: "archive" },
+        { name: "日记", icon: "https://image.uglycat.cc/v9ywqj.png", appId: "diary" },
+        { name: "游戏中心", icon: "https://image.uglycat.cc/t6wy03.png", appId: "game" },
+        { name: "网易云", icon: "https://image.uglycat.cc/vry08c.png", appId: "cloudmusic" },
+        { name: "随身听", icon: "https://image.uglycat.cc/eefw57.png", appId: "walkman" },
+        { name: "陪伴", icon: "https://image.uglycat.cc/k4p1cr.png", appId: "accompany" },
+        { name: "回响", icon: "https://image.uglycat.cc/lh4flq.png", appId: "echo" },
+        { name: "WeChat", icon: "https://image.uglycat.cc/fv0c8t.png", appId: "wechat_en" },
+        { name: "查岗", icon: "https://image.uglycat.cc/i0483r.png", appId: "check" },
+        { name: "短信", icon: "https://image.uglycat.cc/vbyc0g.png", appId: "sms" },
+        { name: "淘宝", icon: "https://image.uglycat.cc/rw7a4d.png", appId: "taobao" },
+        { name: "discord", icon: "https://image.uglycat.cc/s2nis3.png", appId: "discord" },
+        { name: "学习通", icon: "https://image.uglycat.cc/pagxkk.png", appId: "xuexitong" },
+        { name: "58同城", icon: "https://image.uglycat.cc/zathqj.png", appId: "58" }
+    ];
+
+    // ==========================================
+    // 核心大招：全局 APP 完美路由器 (全自动判定)
+    // ==========================================
+    function openApp(appId, appName) {
+        const appLayer = document.getElementById('app-layer');
+        appLayer.style.display = 'block';
+        
+        setTimeout(() => appLayer.classList.add('active'), 10);
+        
+        // 分发到你以后创建的所有 js 文件里！
+        switch(appId) {
+            case 'wechat': if (typeof renderWechat === 'function') renderWechat(); else renderDefaultApp(appName); break;
+            case 'worldbook': if (typeof renderWorldbook === 'function') renderWorldbook(); else renderDefaultApp(appName); break;
+            case 'settings': if (typeof renderSettings === 'function') renderSettings(); else renderDefaultApp(appName); break;
+            case 'theme': if (typeof renderTheme === 'function') renderTheme(); else renderDefaultApp(appName); break;
+            case 'album': if (typeof renderAlbum === 'function') renderAlbum(); else renderDefaultApp(appName); break;
+            case 'weather': if (typeof renderWeather === 'function') renderWeather(); else renderDefaultApp(appName); break;
+            case 'couple': if (typeof renderCouple === 'function') renderCouple(); else renderDefaultApp(appName); break;
+            case 'jinjiang': if (typeof renderJinjiang === 'function') renderJinjiang(); else renderDefaultApp(appName); break;
+            case 'home': if (typeof renderHome === 'function') renderHome(); else renderDefaultApp(appName); break;
+            case 'archive': if (typeof renderArchive === 'function') renderArchive(); else renderDefaultApp(appName); break;
+            case 'diary': if (typeof renderDiary === 'function') renderDiary(); else renderDefaultApp(appName); break;
+            case 'game': if (typeof renderGame === 'function') renderGame(); else renderDefaultApp(appName); break;
+            case 'cloudmusic': if (typeof renderCloudmusic === 'function') renderCloudmusic(); else renderDefaultApp(appName); break;
+            case 'walkman': if (typeof renderWalkman === 'function') renderWalkman(); else renderDefaultApp(appName); break;
+            case 'accompany': if (typeof renderAccompany === 'function') renderAccompany(); else renderDefaultApp(appName); break;
+            case 'echo': if (typeof renderEcho === 'function') renderEcho(); else renderDefaultApp(appName); break;
+            case 'wechat_en': if (typeof renderWechatEn === 'function') renderWechatEn(); else renderDefaultApp(appName); break;
+            case 'check': if (typeof renderCheck === 'function') renderCheck(); else renderDefaultApp(appName); break;
+            case 'sms': if (typeof renderSms === 'function') renderSms(); else renderDefaultApp(appName); break;
+            case 'taobao': if (typeof renderTaobao === 'function') renderTaobao(); else renderDefaultApp(appName); break;
+            case 'discord': if (typeof renderDiscord === 'function') renderDiscord(); else renderDefaultApp(appName); break;
+            case 'xuexitong': if (typeof renderXuexitong === 'function') renderXuexitong(); else renderDefaultApp(appName); break;
+            case '58': if (typeof render58 === 'function') render58(); else renderDefaultApp(appName); break;
+            default: renderDefaultApp(appName);
+        }
+    }
+
+    function closeApp() {
+        const appLayer = document.getElementById('app-layer');
+        appLayer.classList.remove('active');
+        setTimeout(() => {
+            appLayer.style.display = 'none';
+            appLayer.innerHTML = ''; 
+        }, 350);
+    }
+
+    // ================= 通用原生缺省页面 =================
+    function renderDefaultApp(appName) {
+        const appLayer = document.getElementById('app-layer');
+        appLayer.innerHTML = `
+            <div style="width:100%; height:100%; background:#F2F2F7; display:flex; flex-direction:column; align-items:center;">
+                <div style="height:calc(44px + env(safe-area-inset-top, 20px)); padding-top:env(safe-area-inset-top, 20px); width:100%; display:flex; align-items:center; padding-left:15px;">
+                    <div onclick="closeApp()" style="color:#007AFF; font-size:17px; cursor:pointer;">
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none;vertical-align:middle;margin-right:2px;"><path d="M15 18l-6-6 6-6"/></svg> 返回桌面
+                    </div>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#8E8E93;">
+                    <svg viewBox="0 0 24 24" style="width:60px;height:60px;stroke:currentColor;stroke-width:1;fill:none;margin-bottom:15px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <div style="font-size:20px; font-weight:600; color:#000; margin-bottom:5px;">${appName}</div>
+                    <div style="font-size:15px;">正在努力开发中...</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ================= 数据与渲染 =================
+    let polaroidData = [ { img: 'https://image.uglycat.cc/at03ir.png' }, { img: 'https://image.uglycat.cc/odlgao.png' }, { img: 'https://image.uglycat.cc/33wvws.png' } ];
+    let douyinData = { img: 'https://image.uglycat.cc/crabxl.png', text: '困困嘟' };
+    let recordData = { polaroidImg: 'https://image.uglycat.cc/wtj209.png', vinylImg: 'https://image.uglycat.cc/z70wta.png' };
+    let musicData = { img: 'https://images.unsplash.com/photo-1493225457124-a1a2a5f5f9da?w=200&q=80', title: '唯一', artist: '告五人', isPlaying: true, isLoop: false, isLiked: false };
+
+    const svgLoop = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>`;
+    const svgLoopOne = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path><text x="10" y="16" font-size="8" stroke="none" fill="currentColor" font-weight="bold">1</text></svg>`;
+    const svgPrev = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>`;
+    const svgNext = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>`;
+    const svgPlay = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+    const svgPause = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+    const svgHeartOutline = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+    const svgHeartFilled = `<svg viewBox="0 0 24 24" fill="#333" stroke="#333" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+
+    function createAppElement(app) { 
+        return `<div class="grid-item app" onclick="openApp('${app.appId}', '${app.name}')">
+                    <img src="${app.icon}"> 
+                    <span class="app-name">${app.name}</span>
+                </div>`; 
+    }
+
+    function createPolaroidWidgetElement() { return `<div class="grid-item widget-polaroid" onclick="openWidgetModal(this, 'polaroid')"><div class="polaroid-box"><div class="polaroid p1"><div class="tape"></div><img src="${polaroidData[0].img}"></div><div class="polaroid p2"><div class="tape"></div><img src="${polaroidData[1].img}"></div><div class="polaroid p3"><div class="tape"></div><img src="${polaroidData[2].img}"></div></div><span class="widget-label">widgy</span></div>`; }
+    function createDouyinWidgetElement() { return `<div class="grid-item widget-douyin" onclick="openWidgetModal(this, 'douyin')"><div class="douyin-box"><div class="dy-avatar-wrapper"><div class="dy-bubble">${douyinData.text}</div><div class="dy-ring"><img src="${douyinData.img}" class="dy-avatar"><div class="dy-plus">+</div></div></div></div><span class="widget-label">widgy</span></div>`; }
+    function createRecordWidgetElement() { return `<div class="grid-item widget-record" onclick="openWidgetModal(this, 'record')"><div class="record-box"><div class="re-vinyl"><img src="${recordData.vinylImg}" class="re-vinyl-cover"><div class="re-vinyl-hole"></div></div><div class="re-polaroid"><img src="${recordData.polaroidImg}" class="re-photo"><div class="re-star rs1">✦</div><div class="re-star rs2">✧</div><div class="re-star rs3">✦</div><div class="re-star rs4">✧</div><div class="re-star rs5">✦</div></div></div><span class="widget-label">widgy</span></div>`; }
+    function createMusicWidgetElement() {
+        return `
+            <div class="grid-item widget-music" onclick="openWidgetModal(this, 'music')">
+                <div class="music-box-wrap">
+                    <div class="music-box">
+                        <div class="mu-left"><div class="mu-vinyl-wrapper"><div class="mu-vinyl" id="mu-vinyl"><img src="${musicData.img}" class="mu-vinyl-cover"><div class="mu-vinyl-hole"></div></div><div class="mu-stylus" id="mu-stylus"><div class="mu-stylus-pivot"></div><div class="mu-stylus-arm"><div class="mu-stylus-head"></div></div></div></div></div>
+                        <div class="mu-right">
+                            <div class="mu-info"><div class="mu-title">${musicData.title}</div><div class="mu-artist">${musicData.artist}</div></div>
+                            <div class="mu-lyrics"><div class="mu-lyrics-inner" id="mu-lyrics"><p>你真的忘了我吗</p><p>还是你假装傻</p><p>我真的忘了你吗</p><p>还是我还在挣扎</p><p>如果真的忘了我</p><p>怎么还会痛</p></div></div>
+                            <div class="mu-controls" onclick="event.stopPropagation()">
+                                <div class="mu-btn" id="btn-loop" onclick="toggleLoop()">${musicData.isLoop ? svgLoopOne : svgLoop}</div>
+                                <div class="mu-btn">${svgPrev}</div>
+                                <div class="mu-btn play" id="btn-play" onclick="togglePlay()">${musicData.isPlaying ? svgPause : svgPlay}</div>
+                                <div class="mu-btn">${svgNext}</div>
+                                <div class="mu-btn" id="btn-heart" onclick="toggleHeart()">${musicData.isLiked ? svgHeartFilled : svgHeartOutline}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <span class="widget-label">widgy</span>
+            </div>`;
+    }
+
+    function render() {
+        document.getElementById('dock-container').innerHTML = dockAppsData.map(createAppElement).join('');
+        const pagesContainer = document.getElementById('pages-container');
+        const page1 = document.createElement('div');
+        page1.className = 'page';
+        page1.innerHTML += createPolaroidWidgetElement() + createDouyinWidgetElement() + homeAppsData.slice(0, 4).map(createAppElement).join('') + homeAppsData.slice(4, 6).map(createAppElement).join('') + createRecordWidgetElement() + homeAppsData.slice(6, 8).map(createAppElement).join(''); 
+        pagesContainer.appendChild(page1);
+
+        if(homeAppsData.length > 8) {
+            const page2 = document.createElement('div');
+            page2.className = 'page';
+            page2.innerHTML += createMusicWidgetElement() + homeAppsData.slice(8).map(createAppElement).join('');
+            pagesContainer.appendChild(page2);
+        }
+    }
+    render();
+
+    function togglePlay() { musicData.isPlaying = !musicData.isPlaying; document.getElementById('btn-play').innerHTML = musicData.isPlaying ? svgPause : svgPlay; const vinyl = document.getElementById('mu-vinyl'); const stylus = document.getElementById('mu-stylus'); const lyrics = document.getElementById('mu-lyrics'); if(musicData.isPlaying) { vinyl.classList.remove('paused'); stylus.classList.remove('paused'); lyrics.classList.remove('paused'); } else { vinyl.classList.add('paused'); stylus.classList.add('paused'); lyrics.classList.add('paused'); } }
+    function toggleHeart() { musicData.isLiked = !musicData.isLiked; document.getElementById('btn-heart').innerHTML = musicData.isLiked ? svgHeartFilled : svgHeartOutline; }
+    function toggleLoop() { musicData.isLoop = !musicData.isLoop; document.getElementById('btn-loop').innerHTML = musicData.isLoop ? svgLoopOne : svgLoop; }
+
+    let currentEditingWidget = null; let currentWidgetType = ''; const modalOverlay = document.getElementById('modal-overlay');
+
+    function openWidgetModal(element, type) {
+        currentEditingWidget = element; currentWidgetType = type;
+        const modalContent = document.querySelector('.modal-content'); const modalHeader = document.querySelector('.modal-header'); modalContent.innerHTML = ''; 
+
+        if (type === 'polaroid') {
+            modalHeader.innerText = '编辑拍立得组件';
+            for(let i=0; i<3; i++) { modalContent.innerHTML += `<div class="edit-card"><h4>照片 ${i + 1}</h4><div class="input-group"><label>URL:</label><input type="text" id="img-url-${i}" value="${polaroidData[i].img}"></div><div class="input-group file-upload"><label>或相册:</label><input type="file" accept="image/*" onchange="previewLocalImage(this, ${i})"></div></div>`; }
+        } else if (type === 'douyin') {
+            modalHeader.innerText = '编辑状态组件';
+            modalContent.innerHTML += `<div class="edit-card"><h4>状态设置</h4><div class="input-group"><label>气泡文字:</label><input type="text" id="dy-text" value="${douyinData.text}" maxlength="12"></div><div class="input-group"><label>URL:</label><input type="text" id="dy-img-url" value="${douyinData.img}"></div><div class="input-group file-upload"><label>或相册:</label><input type="file" accept="image/*" onchange="previewLocalImage(this, 0)"></div></div>`;
+        } else if (type === 'record') {
+            modalHeader.innerText = '编辑黑胶星空组件';
+            modalContent.innerHTML += `<div class="edit-card"><h4>拍立得图片</h4><div class="input-group"><label>URL:</label><input type="text" id="re-polaroid-url" value="${recordData.polaroidImg}"></div><div class="input-group file-upload"><label>或相册:</label><input type="file" accept="image/*" onchange="previewLocalImage(this, 0)"></div></div><div class="edit-card"><h4>唱片封面</h4><div class="input-group"><label>URL:</label><input type="text" id="re-vinyl-url" value="${recordData.vinylImg}"></div><div class="input-group file-upload"><label>或相册:</label><input type="file" accept="image/*" onchange="previewLocalImage(this, 1)"></div></div>`;
+        } else if (type === 'music') {
+            modalHeader.innerText = '编辑音乐组件';
+            modalContent.innerHTML += `<div class="edit-card"><h4>音乐信息</h4><div class="input-group"><label>歌名:</label><input type="text" id="mu-title-input" value="${musicData.title}" maxlength="15"></div><div class="input-group"><label>歌手:</label><input type="text" id="mu-artist-input" value="${musicData.artist}" maxlength="15"></div><div class="input-group"><label>封面URL:</label><input type="text" id="mu-cover-url" value="${musicData.img}"></div><div class="input-group file-upload"><label>或封面:</label><input type="file" accept="image/*" onchange="previewLocalImage(this, 0)"></div></div>`;
+        }
+        modalOverlay.classList.add('active');
+    }
+
+    function closeModal() { modalOverlay.classList.remove('active'); currentEditingWidget = null; currentWidgetType = ''; }
+    let tempImages = [null, null, null];
+    function previewLocalImage(input, index) { const file = input.files[0]; if (file) { const reader = new FileReader(); reader.onload = function(e) { tempImages[index] = e.target.result; let urlInputId = ''; if (currentWidgetType === 'polaroid') urlInputId = `img-url-${index}`; else if (currentWidgetType === 'douyin') urlInputId = 'dy-img-url'; else if (currentWidgetType === 'record') urlInputId = index === 0 ? 're-polaroid-url' : 're-vinyl-url'; else if (currentWidgetType === 'music') urlInputId = 'mu-cover-url'; document.getElementById(urlInputId).value = "(已选择本地图片)"; }; reader.readAsDataURL(file); } }
+    function saveWidget() {
+        if (!currentEditingWidget) return;
+        if (currentWidgetType === 'polaroid') { for(let i=0; i<3; i++) { const urlValue = document.getElementById(`img-url-${i}`).value; if (tempImages[i] && urlValue === "(已选择本地图片)") polaroidData[i].img = tempImages[i]; else if (urlValue !== "(已选择本地图片)") polaroidData[i].img = urlValue; currentEditingWidget.querySelector(`.p${i+1} img`).src = polaroidData[i].img; } } else if (currentWidgetType === 'douyin') { douyinData.text = document.getElementById('dy-text').value; const urlValue = document.getElementById('dy-img-url').value; if (tempImages[0] && urlValue === "(已选择本地图片)") douyinData.img = tempImages[0]; else if (urlValue !== "(已选择本地图片)") douyinData.img = urlValue; currentEditingWidget.querySelector('.dy-bubble').innerText = douyinData.text; currentEditingWidget.querySelector('.dy-avatar').src = douyinData.img; } else if (currentWidgetType === 'record') { const pUrlValue = document.getElementById('re-polaroid-url').value; const vUrlValue = document.getElementById('re-vinyl-url').value; if (tempImages[0] && pUrlValue === "(已选择本地图片)") recordData.polaroidImg = tempImages[0]; else if (pUrlValue !== "(已选择本地图片)") recordData.polaroidImg = pUrlValue; if (tempImages[1] && vUrlValue === "(已选择本地图片)") recordData.vinylImg = tempImages[1]; else if (vUrlValue !== "(已选择本地图片)") recordData.vinylImg = vUrlValue; currentEditingWidget.querySelector('.re-photo').src = recordData.polaroidImg; currentEditingWidget.querySelector('.re-vinyl-cover').src = recordData.vinylImg; } else if (currentWidgetType === 'music') { musicData.title = document.getElementById('mu-title-input').value; musicData.artist = document.getElementById('mu-artist-input').value; const urlValue = document.getElementById('mu-cover-url').value; if (tempImages[0] && urlValue === "(已选择本地图片)") musicData.img = tempImages[0]; else if (urlValue !== "(已选择本地图片)") musicData.img = urlValue; currentEditingWidget.querySelector('.mu-title').innerText = musicData.title; currentEditingWidget.querySelector('.mu-artist').innerText = musicData.artist; currentEditingWidget.querySelector('.mu-vinyl-cover').src = musicData.img; }
+        tempImages = [null, null, null]; closeModal();
+    }
+</script>
+</body>
+</html>
