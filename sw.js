@@ -1,31 +1,32 @@
-const CACHE_NAME = 'Rainy-v1'; // 悄悄加了个 -v1，以后如果你改了代码，把它改成 v2 就能强制手机更新啦！
+const CACHE_NAME = 'Rainy-v2';
+
+// 我们只强制缓存最核心的两个文件，绝不让图片报错卡死整个进程！
 const urlsToCache = [
   './',
-  './index.html',
-  './manifest.json',
-  './icon.png'  // 这里我帮你把注释去掉了，完美把图标也缓存进手机！
+  './index.html'
 ];
 
-// 安装 Service Worker 并缓存核心文件
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+      .then(cache => {
+        console.log('开始缓存核心文件');
+        // 用一种不会报错的方式缓存
+        return cache.addAll(urlsToCache).catch(err => console.log('部分缓存失败，但不影响安装', err));
+      })
   );
+  self.skipWaiting();
 });
 
-// 拦截网络请求，优先使用缓存
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // 如果在缓存中找到，直接返回缓存；否则发起网络请求
         return response || fetch(event.request);
       })
   );
 });
 
-// 更新缓存
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -38,4 +39,5 @@ self.addEventListener('activate', event => {
       );
     })
   );
+  self.clients.claim();
 });
