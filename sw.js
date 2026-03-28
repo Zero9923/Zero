@@ -1,37 +1,20 @@
-const CACHE_NAME = 'Rainy-Auto-Cache';
+// 永远不缓存！只做全屏壳子！
 
-// 安装时立刻接管，不磨叽
-self.addEventListener('install', event => {
-  self.skipWaiting();
+self.addEventListener('install', (e) => {
+  self.skipWaiting(); // 立刻生效
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (e) => {
+  // 把以前那个智障管家存的死缓存全部砸烂删掉！
+  e.waitUntil(
+    caches.keys().then((keyList) => {
+      return Promise.all(keyList.map((key) => caches.delete(key)));
+    })
+  );
   self.clients.claim();
 });
 
-// 核心魔法：全自动网络优先 + 自动备份机制
-self.addEventListener('fetch', event => {
-  // 只处理我们自己的文件请求（比如 .js, .html, .png）
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    // 第一步：先去问 GitHub 拿最新写的代码（网络请求）
-    fetch(event.request)
-      .then(networkResponse => {
-        // 如果拿到了最新的代码，就偷偷在手机本地备份一份！
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        // 把最新代码交给屏幕显示
-        return networkResponse;
-      })
-      .catch(() => {
-        // 第二步：万一你手机断网了（或者开了飞行模式）
-        // 管家就会自动翻出之前备份在手机里的旧文件给你看！
-        return caches.match(event.request);
-      })
-  );
+self.addEventListener('fetch', (e) => {
+  // 核心：不管你要什么文件，直接去 GitHub 拿最新的！不准拦截！
+  e.respondWith(fetch(e.request));
 });
