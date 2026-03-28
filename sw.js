@@ -1,43 +1,37 @@
-const CACHE_NAME = 'Rainy-v2';
+const CACHE_NAME = 'Rainy-Auto-Cache';
 
-// 我们只强制缓存最核心的两个文件，绝不让图片报错卡死整个进程！
-const urlsToCache = [
-  './',
-  './index.html'
-];
-
+// 安装时立刻接管，不磨叽
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('开始缓存核心文件');
-        // 用一种不会报错的方式缓存
-        return cache.addAll(urlsToCache).catch(err => console.log('部分缓存失败，但不影响安装', err));
-      })
-  );
   self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        return response || fetch(event.request);
-      })
-  );
+self.addEventListener('activate', event => {
+  self.clients.claim();
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+// 核心魔法：全自动网络优先 + 自动备份机制
+self.addEventListener('fetch', event => {
+  // 只处理我们自己的文件请求（比如 .js, .html, .png）
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    // 第一步：先去问 GitHub 拿最新写的代码（网络请求）
+    fetch(event.request)
+      .then(networkResponse => {
+        // 如果拿到了最新的代码，就偷偷在手机本地备份一份！
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        // 把最新代码交给屏幕显示
+        return networkResponse;
+      })
+      .catch(() => {
+        // 第二步：万一你手机断网了（或者开了飞行模式）
+        // 管家就会自动翻出之前备份在手机里的旧文件给你看！
+        return caches.match(event.request);
+      })
   );
-  self.clients.claim();
 });
